@@ -82,6 +82,21 @@ export class SpeedSelect extends Phaser.Scene {
       this.scene.start("MainMenuScene");
     });
 
+    const titleText = this.add.text(width / 2, -50, "Select a speed!", {
+      fontSize: "56px",
+      fontFamily: '"Jersey 10", sans-serif',
+      color: "#dcc89f",
+      stroke: "#7f1a02",
+      strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(5);
+
+    this.tweens.add({
+      targets: titleText,
+      y: height * 0.15,
+      duration: 800,
+      ease: "Bounce.easeOut"
+    });
+
     // --- Speed Buttons (styled like level buttons) ---
     const speeds = [
       { label: "0.5x", multiplier: 0.5 },
