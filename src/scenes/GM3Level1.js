@@ -37,7 +37,9 @@ export default class GM3Level1 extends BaseGM3Scene {
     //Clean up the keyboard listener so it doesn't carry over into the GameOver scene
     this.input.keyboard.off('keydown'); 
     
-    this.scene.start("GameOverScene", { score: this.score, mode: "GM3-Level1", reason });
+    this.scene.start("GameOverScene", { score: this.score, mode: "GM3-Level1", reason,
+      timeSpentPlaying: Math.floor((this.time.now - this.startTime) / 1000),
+     });
   }
 
   buildLevel() {

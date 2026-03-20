@@ -711,6 +711,7 @@ export class MainScene extends Scene {
                         this.scene.start("GameOverScene", {
                             points: this.points,
                             gameKey: this.game_key,
+                            timeSpentPlaying: Math.floor((this.time.now - this.startTime) / 1000),
                         });
                     } else {
                         this.game_over_timeout--;
