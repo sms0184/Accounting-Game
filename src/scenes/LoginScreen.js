@@ -196,8 +196,8 @@ export default class LoginScreen extends Phaser.Scene {
       ? "http://localhost:3000/api" 
       : "http://accounting-game.cse.eng.auburn.edu/api"; 
 
-        // Attach the specific route (make sure /login matches your backend's actual route!)
-        const backendURL = `${apiBase}/login`;
+        
+        const backendURL = `${apiBase}/saml/login`;
       
       const response = await fetch(backendURL, {
         method: "POST",
