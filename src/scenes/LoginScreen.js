@@ -194,7 +194,7 @@ export default class LoginScreen extends Phaser.Scene {
     
         const apiBase = isLocal 
       ? "http://localhost:3000/api" 
-      : "http://accounting-game.cse.eng.auburn.edu/api"; 
+      : "http://accounting-game.cse.eng.auburn.edu/api/"; 
 
         
         const backendURL = `${apiBase}/saml/login`;
