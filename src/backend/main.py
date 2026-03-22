@@ -238,10 +238,14 @@ async def saml_metadata():
     ...
 
 @app.post("/saml/login")
-async def saml_login(request: Request):
-    # This is what your button should hit!
-    # It redirects the student to the Auburn Login page
-    ...
+async def fake_login(payload: dict = Body(...)):
+    # Just take whatever the game sent and say "OK!"
+    username = payload.get("username", "guest").lower()
+    return {
+        "status": "success",
+        "username": username,
+        "message": "Fake login successful"
+    }
 
 @app.post("/saml/acs")
 async def saml_acs(request: Request):
