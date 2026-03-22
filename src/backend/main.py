@@ -237,7 +237,7 @@ async def saml_metadata():
     # Returns the XML metadata for Auburn's IT team
     ...
 
-@app.get("/saml/login")
+@app.post("/saml/login")
 async def saml_login(request: Request):
     # This is what your button should hit!
     # It redirects the student to the Auburn Login page
