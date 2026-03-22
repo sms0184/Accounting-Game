@@ -231,3 +231,19 @@ def preview_rank(game: str, score: int, n: int = TOP_N):
         raise HTTPException(status_code=500, detail="DB not initialized")
     if game not in ALLOWED_GAMES:
         raise
+
+@app.get("/saml/metadata")
+async def saml_metadata():
+    # Returns the XML metadata for Auburn's IT team
+    ...
+
+@app.get("/saml/login")
+async def saml_login(request: Request):
+    # This is what your button should hit!
+    # It redirects the student to the Auburn Login page
+    ...
+
+@app.post("/saml/acs")
+async def saml_acs(request: Request):
+    # This catches the student after they log in and saves their info
+    ...
