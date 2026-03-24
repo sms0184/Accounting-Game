@@ -258,7 +258,7 @@ export default class GM3Level1 extends BaseGM3Scene {
     }
 
     // Delay so they can read the feedback, then automatically advance to next question
-    this.time.delayedCall(1000, () => {
+    this.time.delayedCall(1500, () => {
       this.currentIndex++;
       this._showCurrent(true);
     });
