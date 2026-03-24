@@ -197,7 +197,7 @@ export default class LoginScreen extends Phaser.Scene {
       : "http://accounting-game.cse.eng.auburn.edu/api/"; 
 
         
-        const backendURL = `${apiBase}saml/login`;
+        const backendURL = `${apiBase}saml/fake-login`;
       
       const response = await fetch(backendURL, {
         method: "POST",
