@@ -227,25 +227,6 @@ def preview_rank(game: str, score: int, n: int = TOP_N):
 
 # SAML ---------------------------------------------------------------------------------------------------------------
 
-#@app.get("/saml/metadata")
-#async def saml_metadata():
-#    # Returns the XML metadata for Auburn's IT team
-#    ...
-#
-#@app.post("/saml/login")
-#async def fake_login(payload: dict = Body(...)):
-#    # Just take whatever the game sent and say "OK!"
-#    username = payload.get("username", "guest").lower()
-#    return {
-#        "status": "success",
-#        "username": username,
-#        "message": "Fake login successful"
-#    }
-#
-#@app.post("/saml/acs")
-#async def saml_acs(request: Request):
-#    # This catches the student after they log in and saves their info
-#    ...
 
 SAML_PATH = os.path.join(os.path.dirname(__file__), 'saml')
 
