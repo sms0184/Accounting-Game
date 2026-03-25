@@ -14,6 +14,13 @@ import re
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 
+from stat_queries import *
+
+# for downloading the excel files 
+import io
+import csv
+from fastapi.responses import StreamingResponse
+
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -58,18 +65,13 @@ class LeaderboardRow(BaseModel):
 # --- NEW SQL QUERIES FOR ANALYTICS TABLES ---
 
 SQL_GET_LEADERBOARD = """
-WITH BestScores AS (
-    SELECT username, MAX(score) as max_score
-    FROM public.game_analytics
-    WHERE game = %s
-    GROUP BY username
-)
-SELECT
-    RANK() OVER (ORDER BY max_score DESC) AS rank,
-    max_score AS score,
+SELECT 
+    RANK() OVER (ORDER BY score DESC, created_at ASC) AS rank,
+    score, 
     UPPER(SUBSTRING(username, 1, 3)) AS username
-FROM BestScores
-ORDER BY rank
+FROM public.game_analytics
+WHERE game = %s
+ORDER BY score DESC, created_at ASC
 LIMIT %s;
 """
 
@@ -89,13 +91,9 @@ RETURNING id;
 """
 
 SQL_GET_CURRENT_RANK = """
-WITH BestScores AS (
-    SELECT username, MAX(score) as max_score
-    FROM public.game_analytics
-    WHERE game = %s
-    GROUP BY username
-)
-SELECT COUNT(*) + 1 FROM BestScores WHERE max_score > %s;
+SELECT COUNT(*) + 1 
+FROM public.game_analytics 
+WHERE game = %s AND score > %s;
 """
 
 SQL_PREVIEW = """
@@ -234,25 +232,6 @@ def preview_rank(game: str, score: int, n: int = TOP_N):
 
 # SAML ---------------------------------------------------------------------------------------------------------------
 
-#@app.get("/saml/metadata")
-#async def saml_metadata():
-#    # Returns the XML metadata for Auburn's IT team
-#    ...
-#
-#@app.post("/saml/login")
-#async def fake_login(payload: dict = Body(...)):
-#    # Just take whatever the game sent and say "OK!"
-#    username = payload.get("username", "guest").lower()
-#    return {
-#        "status": "success",
-#        "username": username,
-#        "message": "Fake login successful"
-#    }
-#
-#@app.post("/saml/acs")
-#async def saml_acs(request: Request):
-#    # This catches the student after they log in and saves their info
-#    ...
 
 SAML_PATH = os.path.join(os.path.dirname(__file__), 'saml')
 
@@ -331,3 +310,117 @@ async def fake_login(payload: dict = Body(...)):
         "username": username,
         "message": "Fake login successful"
     }
+
+
+# --- ANALYTICS QUERIES ---
+
+# prof view 
+@app.get("/stats/section/{section_id}")
+def get_section_report(section_id: str):
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            # 1. Individual Performance (Avg, Top, Bottom per game)
+            cur.execute(SQL_PROF_STUDENT_STATS, (section_id,))
+            student_stats = cur.fetchall()
+
+            # 2. Section Averages per Game
+            cur.execute(SQL_PROF_SECTION_AVERAGES, (section_id,))
+            averages = cur.fetchall()
+
+            # 3. Total Time Spent in Game as a Whole
+            cur.execute(SQL_PROF_STUDENT_TIME, (section_id,))
+            time_spent = cur.fetchall()
+
+            return {
+                "section": section_id,
+                "student_breakdown": [
+                    {
+                        "name": f"{r[0]} {r[1]}", 
+                        "user": r[2], 
+                        "game": r[3], 
+                        "avg": float(r[4]), 
+                        "top": r[5], 
+                        "bottom": r[6]
+                    } for r in student_stats
+                ],
+                "section_game_averages": [
+                    {"game": r[0], "avg_score": float(r[1])} for r in averages
+                ],
+                "total_time_records": [
+                    {"name": f"{r[0]} {r[1]}", "user": r[2], "seconds": r[3]} for r in time_spent
+                ]
+            }
+    finally:
+        pool.putconn(conn)
+
+# admin view 
+@app.get("/stats/admin/global-tops")
+def get_admin_global():
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SQL_ADMIN_GLOBAL_TOP_SCORES)
+            rows = cur.fetchall()
+            return [
+                {
+                    "game": r[0], 
+                    "score": r[1], 
+                    "student": f"{r[2]} {r[3]}", 
+                    "username": r[4], 
+                    "section": r[5]
+                } for r in rows
+            ]
+    finally:
+        pool.putconn(conn)
+
+
+@app.get("/stats/section/{section_id}/csv")
+def get_section_csv(section_id: str):
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SQL_PROF_STUDENT_STATS, (section_id,))
+            rows = cur.fetchall()
+
+            # Create an in-memory "file"
+            output = io.StringIO()
+            writer = csv.writer(output)
+            
+            # Add the Header Row for Excel
+            writer.writerow(["First Name", "Last Name", "Username", "Game", "Avg Score", "Top Score", "Bottom Score"])
+            
+            # Add the Data Rows
+            writer.writerows(rows)
+            
+            # Rewind the "file" to the beginning and stream it to the browser
+            output.seek(0)
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=section_{section_id}_report.csv"}
+            )
+    finally:
+        pool.putconn(conn)
+
+@app.get("/stats/admin/global-tops/csv")
+def get_admin_csv():
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SQL_ADMIN_GLOBAL_TOP_SCORES)
+            rows = cur.fetchall()
+
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["Game", "Score", "First Name", "Last Name", "Username", "Section"])
+            writer.writerows(rows)
+            
+            output.seek(0)
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": "attachment; filename=global_top_scores.csv"}
+            )
+    finally:
+        pool.putconn(conn)
