@@ -269,7 +269,7 @@ export class Leaderboard extends Scene {
         this.tableGroup.removeAll(true);
 
         try {
-            const res = await fetch(`${this.game.apiBaseUrl}/leaderboard/${mode}`);
+            const res = await fetch(`${this.game.apiBaseUrl}leaderboard/${mode}`);
             const data = await res.json();
             data.sort((a, b) => b.score - a.score);
 
