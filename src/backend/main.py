@@ -75,13 +75,15 @@ ORDER BY score DESC, created_at ASC
 LIMIT %s;
 """
 
+
 SQL_UPSERT_USER = """
 INSERT INTO public.player_profiles (username, first_name, last_name, section)
 VALUES (%s, %s, %s, %s)
-ON CONFLICT (username) DO UPDATE SET
-    first_name = EXCLUDED.first_name,
-    last_name = EXCLUDED.last_name,
-    section = EXCLUDED.section;
+ON CONFLICT (username) 
+DO UPDATE SET 
+    first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), public.player_profiles.first_name),
+    last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), public.player_profiles.last_name),
+    section = COALESCE(NULLIF(EXCLUDED.section, ''), public.player_profiles.section);
 """
 
 SQL_INSERT_SESSION = """
