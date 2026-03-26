@@ -302,14 +302,41 @@ async def saml_logout(request: Request):
     return RedirectResponse(auth.logout())
 
 # for testing without Auburn SSO — works locally and on the server
+# --- Updated Fake Login that actually saves to DB ---
 @app.post("/saml/fake-login", tags=["SAML"])
 async def fake_login(payload: dict = Body(...)):
     username = payload.get("username", "guest").lower()
-    return {
-        "status": "success",
-        "username": username,
-        "message": "Fake login successful"
-    }
+    first = payload.get("first_name")
+    last = payload.get("last_name")
+    section = payload.get("section")
+
+    if pool is None:
+        raise HTTPException(status_code=500, detail="DB not initialized")
+
+    conn = pool.getconn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                # Use the UPSERT query you already defined at the top of main.py
+                cur.execute(SQL_UPSERT_USER, (
+                    username, 
+                    first, 
+                    last, 
+                    section
+                ))
+        
+        print(f"DEBUG: Profile created/updated for {username} ({first} {last})")
+        
+        return {
+            "status": "success",
+            "username": username,
+            "message": f"Login successful. Profile for {first} {last} updated."
+        }
+    except Exception as e:
+        print(f"Database error in fake-login: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        pool.putconn(conn)
 
 
 # --- ANALYTICS QUERIES ---
