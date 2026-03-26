@@ -79,9 +79,9 @@ SQL_UPSERT_USER = """
 INSERT INTO public.player_profiles (username, first_name, last_name, section)
 VALUES (%s, %s, %s, %s)
 ON CONFLICT (username) DO UPDATE SET
-    first_name = COALESCE(EXCLUDED.first_name, public.player_profiles.first_name),
-    last_name = COALESCE(EXCLUDED.last_name, public.player_profiles.last_name),
-    section = COALESCE(EXCLUDED.section, public.player_profiles.section);
+    first_name = EXCLUDED.first_name,
+    last_name = EXCLUDED.last_name,
+    section = EXCLUDED.section;
 """
 
 SQL_INSERT_SESSION = """
@@ -486,5 +486,29 @@ def get_all_students_csv():
                 media_type="text/csv",
                 headers={"Content-Disposition": "attachment; filename=all_students_report.csv"}
             )
+    finally:
+        pool.putconn(conn)
+
+
+@app.post("/api/register-profile")
+def register_profile(payload: dict = Body(...)):
+    username = payload.get("username").lower()
+    first = payload.get("first_name")
+    last = payload.get("last_name")
+    section = payload.get("section")
+
+    conn = pool.getconn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO public.player_profiles (username, first_name, last_name, section)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (username) DO UPDATE SET
+                        first_name = EXCLUDED.first_name,
+                        last_name = EXCLUDED.last_name,
+                        section = EXCLUDED.section;
+                """, (username, first, last, section))
+        return {"status": "success"}
     finally:
         pool.putconn(conn)
