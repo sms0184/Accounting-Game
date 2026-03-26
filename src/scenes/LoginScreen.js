@@ -180,9 +180,9 @@ export default class LoginScreen extends Phaser.Scene {
     // IMPORTANT: Make sure these keys match what your discovered backend expects!
     const payload = {
       username: username,
-      first_name: firstName,
-      last_name: lastName,
-      section: sectionNumber,
+      first_name: first_name,
+      last_name: last_name,
+      section: section,
       timestamp: new Date().toISOString()
     };
 
@@ -193,8 +193,8 @@ export default class LoginScreen extends Phaser.Scene {
         const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     
         const apiBase = isLocal 
-      ? "http://localhost:8000" 
-      : "http://accounting-game.cse.eng.auburn.edu"; 
+      ? "http://localhost:8000/api" 
+      : "http://accounting-game.cse.eng.auburn.edu/api/"; 
 
         
         const backendURL = `${apiBase}/saml/fake-login`;
