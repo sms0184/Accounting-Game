@@ -33,14 +33,16 @@ export default class GM3Level1 extends BaseGM3Scene {
   _finishToGameOver(reason = "completed") {
     if (this.timerEvent) this.timerEvent.remove(false);
     
+    // CORRECT WAY TO UNBIND: Include the function and the context
+    this.input.keyboard.off('keydown', this._handleKeydown, this); 
     
-    //Clean up the keyboard listener so it doesn't carry over into the GameOver scene
-    this.input.keyboard.off('keydown'); 
-    
-    this.scene.start("GameOverScene", { score: this.score, mode: "GM3-Level1", reason,
-      timeSpentPlaying: Math.floor((this.time.now - this.startTime) / 1000),
-     });
-  }
+    this.scene.start("GameOverScene", { 
+        score: this.score, 
+        mode: "GM3-Level1", 
+        reason,
+        timeSpentPlaying: Math.floor((this.time.now - this.startTime) / 1000),
+    });
+}
 
   buildLevel() {
     // -------------------------------------------------------------------------
