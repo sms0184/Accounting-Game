@@ -315,6 +315,9 @@ async def fake_login(payload: dict = Body(...)):
 
     conn = pool.getconn()
     try:
+
+        conn.autocommit = True 
+        
         with conn:
             with conn.cursor() as cur:
                 # Use the UPSERT query you already defined at the top of main.py
@@ -324,6 +327,7 @@ async def fake_login(payload: dict = Body(...)):
                     last, 
                     section
                 ))
+        conn.commit()
         
         print(f"DEBUG: Profile created/updated for {username} ({first} {last})")
         
