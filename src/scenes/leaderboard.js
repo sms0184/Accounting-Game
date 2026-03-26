@@ -8,6 +8,7 @@ export class Leaderboard extends Scene {
     init(data) {
         this.gameKey = data.gameKey || "game1";
         this.highlightName = data.highlightName || null;
+	this.scoreScope = "section"; // tab state
     }
 
     async create() {
@@ -29,11 +30,82 @@ export class Leaderboard extends Scene {
             .setStrokeStyle(3, 0x570600);
 
         // --- Title ---
-        this.add.text(panelX, panelY - panelHeight / 2 + 40, "Leaderboard", {
+        const title = this.add.text(panelX, panelY - panelHeight / 2 + 40, "Leaderboard", {
             fontSize: "50px",
             fill: "#dcc89f",
             fontFamily: '"Jersey 10", sans-serif',
         }).setOrigin(0.5);
+
+
+
+	// --- (NEW) Section/Global Tabs ---
+	const tabY = panelY - panelHeight / 2 - 25; // slightly above panel
+	const tabWidth = 160;
+	const tabHeight = 45;
+
+	this.tabs = {};
+
+	const createTab = (x, label, key) => {
+    		const tab = this.add.container(x, tabY);
+
+    		// Folder-style shape (slight offset top edge)
+    		const bg = this.add.graphics();
+    		const drawTab = (color) => {
+        		bg.clear();
+        		bg.fillStyle(color, 1);
+        		bg.lineStyle(3, 0x570600);
+
+        		bg.beginPath();
+        		bg.moveTo(-tabWidth/2, tabHeight/2);
+        		bg.lineTo(-tabWidth/2, -tabHeight/2 + 10);
+        		bg.lineTo(-tabWidth/2 + 30, -tabHeight/2);
+        		bg.lineTo(tabWidth/2, -tabHeight/2);
+        		bg.lineTo(tabWidth/2, tabHeight/2);
+        		bg.closePath();
+        		bg.fillPath();
+        		bg.strokePath();
+    		};
+
+    		drawTab(0x7f1a02);
+
+    		const text = this.add.text(0, 0, label, {
+        		fontSize: "28px",
+        		fontFamily: '"Jersey 10", sans-serif',
+        		color: "#dcc89f",
+    		}).setOrigin(0.5);
+
+    		tab.add([bg, text]);
+
+    		// Interaction
+    		tab.setSize(tabWidth, tabHeight);
+    		tab.setInteractive({ useHandCursor: true });
+
+    		tab.on("pointerdown", () => {
+        		if (this.scoreScope !== key) {
+            			this.scoreScope = key;
+            			this.updateTabs();
+            			this.loadLeaderboard(this.gameKey);
+        		}
+    		});
+
+    		tab.draw = drawTab;
+    		tab.bg = bg;
+
+    		this.tabs[key] = tab;
+    		return tab;
+	};
+
+	// Create both tabs
+	const rightEdge = panelWidth / 2; // distance from center to right edge
+	const tabSpacing = 10; // spacing between tabs
+
+	createTab(panelX + rightEdge - tabWidth/2, "Global", "global");   // right-most tab
+	createTab(panelX + rightEdge - tabWidth*1.5 - tabSpacing, "Section", "section");
+
+	// Initial visual state
+	this.updateTabs();
+
+
 
         // --- Mode Buttons (inside panel) ---
         const modes = [
@@ -84,10 +156,11 @@ export class Leaderboard extends Scene {
         };
 
         // new Exit button
-        createButton(panelX - panelWidth / 2 + 72.5,
+        const exitBtn = createButton(panelX - panelWidth / 2 + 72.5,
                      panelY - panelHeight / 2 + 35,
                      "Exit",
                      () => this.scene.start("MainMenuScene"));
+
 
         // OLD BACK BUTTON CODE
         /*
@@ -130,6 +203,8 @@ export class Leaderboard extends Scene {
                 () => this.loadLeaderboard(mode.key, btn)
             );
             btn.setData("modeKey", mode.key);
+
+	    mode.button = btn; // (NEW) store button ref for container
         });
 
         // --- Scrollable container ---
@@ -228,6 +303,63 @@ export class Leaderboard extends Scene {
         });
 
 
+	
+	// --- Wrap leaderboard elements in a container for scaling ---
+	const verticalOffset = 23;
+	this.leaderboardContainer = this.add.container(panelX, panelY + verticalOffset);
+	panel.x = 0;
+	panel.y = 0;
+	
+	// add panel
+	this.leaderboardContainer.add(panel);
+
+	// add title
+	title.x -= panelX;
+        title.y -= panelY;
+	this.leaderboardContainer.add(title);
+
+	// add scrollable table
+	this.tableGroup.x -= panelX;
+	this.tableGroup.y -= panelY;
+	this.leaderboardContainer.add(this.tableGroup);
+
+	// add scroll bar
+	this.scrollTrack.x -= panelX;
+        this.scrollTrack.y -= panelY;
+	this.scrollThumb.x -= panelX;
+        this.scrollThumb.y -= panelY;
+	this.leaderboardContainer.add(this.scrollTrack);
+	this.leaderboardContainer.add(this.scrollThumb);
+
+	// add mode buttons
+	modes.forEach((mode, i) => {
+    	    if (mode.button) { // button reference
+        	mode.button.x -= panelX;
+        	mode.button.y -= panelY;
+        	this.leaderboardContainer.add(mode.button);
+    	    }
+	});
+
+	// add tabs
+	if (this.tabs) {
+    	    Object.values(this.tabs).forEach(tab => {
+		tab.x -= panelX;
+		tab.y -= panelY;
+		this.leaderboardContainer.add(tab);
+	    });
+	}
+
+	// add exit button
+	exitBtn.x -= panelX;
+        exitBtn.y -= panelY;
+	this.leaderboardContainer.add(exitBtn);
+
+	// scale entire leaderboard container
+	const scaleFactor = 0.95; // SCALE
+	this.leaderboardContainer.setScale(scaleFactor);
+
+	
+
         // --- Load leaderboard ---
         this.loadLeaderboard(this.gameKey);
 
@@ -264,12 +396,36 @@ export class Leaderboard extends Scene {
         this.scrollThumb.y = trackTop + scrollRatio * trackHeight;
     }
 
+    
+    // (NEW) leaderboard tab UI
+    updateTabs() {
+    	Object.entries(this.tabs).forEach(([key, tab]) => {
+            if (key === this.scoreScope) {
+            	tab.draw(0xa8321a); // active (lighter, matches panel)
+            	tab.setDepth(5);
+            } 
+	    else {
+            	tab.draw(0x7f1a02); // inactive
+                tab.setDepth(4);
+            }
+    	});
+    }
+
+
     async loadLeaderboard(mode, button = null) {
         // Clear old
         this.tableGroup.removeAll(true);
 
         try {
             const res = await fetch(`${this.game.apiBaseUrl}leaderboard/${mode}`);
+	    
+	    // LINE TO USE WHEN BACKEND IS UPDATED
+ 	    /*
+	    const res = await fetch(
+    		`${this.game.apiBaseUrl}leaderboard/${mode}?scope=${this.scoreScope}`
+	    );
+	    */
+
             const data = await res.json();
             data.sort((a, b) => b.score - a.score);
 
