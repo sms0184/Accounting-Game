@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 
+
+
+
 <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -12,6 +15,14 @@
 
     <!-- Your stylesheet -->
     <link rel="stylesheet" href="/style.css">
+
+    <script>
+  // Fake the crypto function since we are on HTTP
+  //lets us talk to the server even tho we don't have the full security of HTTPS, which is fine for development
+    if (!window.crypto.randomUUID) {
+        window.crypto.randomUUID = () => 'f-' + Math.random().toString(36).substr(2, 9);
+    }
+</script>
 </head>
 
 <body>

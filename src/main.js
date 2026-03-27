@@ -22,6 +22,10 @@ import GM3Level2 from "./scenes/GM3Level2";
 import GM3Level3 from "./scenes/GM3Level3";
 import GM3PauseScene from "./scenes/GM3PauseScene";
 
+// login and dashboards for testing
+import  ProfessorDash  from "./scenes/ProfessorDash.js";
+import  AdminDash  from "./scenes/AdminDash.js";
+
 import LoginScreen from "./scenes/LoginScreen";
 
 // More information about config: https://newdocs.phaser.io/docs/3.70.0/Phaser.Types.Core.GameConfig
@@ -73,6 +77,8 @@ const config = {
     Leaderboard,
     //login screen for testing 
     LoginScreen,
+    ProfessorDash,
+    AdminDash,
   ],
 };
 

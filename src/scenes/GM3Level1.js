@@ -11,7 +11,7 @@ export default class GM3Level1 extends BaseGM3Scene {
     
     //We keep currentCorrect around just in case, but add variables to handle text input states
     this.currentCorrect = -1; 
-    this.currentInput = "";         // Stores the player's current typed numbers
+    this.currentInput = "";         
     this.acceptingInput = false;    // Acts as a gatekeeper so players can't type during countdowns or feedback
     this._uiNodes = [];
     
@@ -33,14 +33,16 @@ export default class GM3Level1 extends BaseGM3Scene {
   _finishToGameOver(reason = "completed") {
     if (this.timerEvent) this.timerEvent.remove(false);
     
+    // unbind
+    this.input.keyboard.off('keydown', this._handleKeydown, this); 
     
-    //Clean up the keyboard listener so it doesn't carry over into the GameOver scene
-    this.input.keyboard.off('keydown'); 
-    
-    this.scene.start("GameOverScene", { score: this.score, mode: "GM3-Level1", reason,
-      timeSpentPlaying: Math.floor((this.time.now - this.startTime) / 1000),
-     });
-  }
+    this.scene.start("GameOverScene", { 
+        score: this.score, 
+        mode: "GM3-Level1", 
+        reason,
+        timeSpentPlaying: Math.floor((this.time.now - this.startTime) / 1000),
+    });
+}
 
   buildLevel() {
     // -------------------------------------------------------------------------
@@ -258,7 +260,7 @@ export default class GM3Level1 extends BaseGM3Scene {
     }
 
     // Delay so they can read the feedback, then automatically advance to next question
-    this.time.delayedCall(1000, () => {
+    this.time.delayedCall(1500, () => {
       this.currentIndex++;
       this._showCurrent(true);
     });

@@ -41,7 +41,7 @@ export default class LoginScreen extends Phaser.Scene {
 
     backBtn.on("pointerdown", () => {
         if ((this.game.sfxVolume ?? this.sound.volume) > 0) this.sound.play("selection");
-        this.scene.start("SettingsScene"); // Sends you back to settings
+        this.scene.start("SettingsScene"); 
     });
     backBtn.on("pointerover", () => backBtn.setColor("#ffffff"));
     backBtn.on("pointerout", () => backBtn.setColor("#dcc89f"));
@@ -179,10 +179,10 @@ export default class LoginScreen extends Phaser.Scene {
     // Package the payload. 
     // IMPORTANT: Make sure these keys match what your discovered backend expects!
     const payload = {
-      username: username,
-      first_name: firstName,
-      last_name: lastName,
-      section: sectionNumber,
+      username: this.formData.username,      
+      first_name: this.formData.firstName,
+      last_name: this.formData.lastName,       
+      section: this.formData.sectionNumber,    
       timestamp: new Date().toISOString()
     };
 
@@ -193,11 +193,11 @@ export default class LoginScreen extends Phaser.Scene {
         const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     
         const apiBase = isLocal 
-      ? "http://localhost:3000/api" 
+      ? "http://localhost:8000/api" 
       : "http://accounting-game.cse.eng.auburn.edu/api/"; 
 
         
-        const backendURL = `${apiBase}/saml/login`;
+        const backendURL = `${apiBase}/saml/fake-login`;
       
       const response = await fetch(backendURL, {
         method: "POST",

@@ -14,6 +14,13 @@ import re
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 
+from stat_queries import *
+
+# for downloading the excel files 
+import io
+import csv
+from fastapi.responses import StreamingResponse
+
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -58,28 +65,25 @@ class LeaderboardRow(BaseModel):
 # --- NEW SQL QUERIES FOR ANALYTICS TABLES ---
 
 SQL_GET_LEADERBOARD = """
-WITH BestScores AS (
-    SELECT username, MAX(score) as max_score
-    FROM public.game_analytics
-    WHERE game = %s
-    GROUP BY username
-)
-SELECT
-    RANK() OVER (ORDER BY max_score DESC) AS rank,
-    max_score AS score,
+SELECT 
+    RANK() OVER (ORDER BY score DESC, created_at ASC) AS rank,
+    score, 
     UPPER(SUBSTRING(username, 1, 3)) AS username
-FROM BestScores
-ORDER BY rank
+FROM public.game_analytics
+WHERE game = %s
+ORDER BY score DESC, created_at ASC
 LIMIT %s;
 """
+
 
 SQL_UPSERT_USER = """
 INSERT INTO public.player_profiles (username, first_name, last_name, section)
 VALUES (%s, %s, %s, %s)
-ON CONFLICT (username) DO UPDATE SET
-    first_name = COALESCE(EXCLUDED.first_name, public.player_profiles.first_name),
-    last_name = COALESCE(EXCLUDED.last_name, public.player_profiles.last_name),
-    section = COALESCE(EXCLUDED.section, public.player_profiles.section);
+ON CONFLICT (username) 
+DO UPDATE SET 
+    first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), public.player_profiles.first_name),
+    last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), public.player_profiles.last_name),
+    section = COALESCE(NULLIF(EXCLUDED.section, ''), public.player_profiles.section);
 """
 
 SQL_INSERT_SESSION = """
@@ -89,13 +93,9 @@ RETURNING id;
 """
 
 SQL_GET_CURRENT_RANK = """
-WITH BestScores AS (
-    SELECT username, MAX(score) as max_score
-    FROM public.game_analytics
-    WHERE game = %s
-    GROUP BY username
-)
-SELECT COUNT(*) + 1 FROM BestScores WHERE max_score > %s;
+SELECT COUNT(*) + 1 
+FROM public.game_analytics 
+WHERE game = %s AND score > %s;
 """
 
 SQL_PREVIEW = """
@@ -231,3 +231,317 @@ def preview_rank(game: str, score: int, n: int = TOP_N):
         raise HTTPException(status_code=500, detail="DB not initialized")
     if game not in ALLOWED_GAMES:
         raise
+
+# SAML ---------------------------------------------------------------------------------------------------------------
+
+
+SAML_PATH = os.path.join(os.path.dirname(__file__), 'saml')
+
+def prepare_fastapi_request(request: Request, body: dict = {}):
+    return {
+        'https': 'on' if request.url.scheme == 'https' else 'off',
+        'http_host': request.headers.get('host', request.url.hostname),
+        'script_name': request.url.path,
+        'get_data': dict(request.query_params),
+        'post_data': body
+    }
+
+# returns SP metadata XML, which IdP admins can use to configure the connection. No auth required since it's public info.
+@app.get('/saml/metadata', tags=["SAML"])
+async def saml_metadata(request: Request):
+    req = prepare_fastapi_request(request)
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=SAML_PATH)
+    settings = auth.get_settings()
+    metadata = settings.get_sp_metadata()
+    errors = settings.validate_metadata(metadata)
+    if errors:
+        return Response(content=f"Metadata error: {', '.join(errors)}", status_code=500)
+    return Response(content=metadata, media_type='text/xml')
+
+# redirects to auburn login page
+@app.get('/saml/login', tags=["SAML"])
+async def saml_login(request: Request):
+    req = prepare_fastapi_request(request)
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=SAML_PATH)
+    return RedirectResponse(auth.login())
+
+# IdP posts SAML response here after login, we then validate it and extract user info
+@app.post('/saml/acs', tags=["SAML"])
+async def saml_acs(request: Request):
+    form = await request.form()
+    req = prepare_fastapi_request(request, dict(form))
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=SAML_PATH)
+    auth.process_response()
+    errors = auth.get_errors()
+    if errors:
+        return Response(
+            content=f"SAML error: {', '.join(errors)} — {auth.get_last_error_reason()}",
+            status_code=400
+        )
+    if not auth.is_authenticated():
+        return Response(content="Not authenticated", status_code=403)
+    # grab student info
+    nameid = auth.get_nameid()
+    attrs = auth.get_attributes()
+    return RedirectResponse('/', status_code=302)
+
+# handles log out requests/responses
+@app.get('/saml/sls', tags=["SAML"])
+async def saml_sls(request: Request):
+    req = prepare_fastapi_request(request)
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=SAML_PATH)
+    url = auth.process_slo()
+    errors = auth.get_errors()
+    if errors:
+        return Response(content=f"SLO error: {', '.join(errors)}", status_code=400)
+    return RedirectResponse(url or '/')
+
+# initiates logout
+@app.get('/saml/logout', tags=["SAML"])
+async def saml_logout(request: Request):
+    req = prepare_fastapi_request(request)
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=SAML_PATH)
+    return RedirectResponse(auth.logout())
+
+# for testing without Auburn SSO — works locally and on the server
+# --- Updated Fake Login that actually saves to DB ---
+@app.post("/saml/fake-login", tags=["SAML"])
+async def fake_login(payload: dict = Body(...)):
+    username = payload.get("username", "guest").lower()
+    first = payload.get("first_name")
+    last = payload.get("last_name")
+    section = payload.get("section")
+
+    if pool is None:
+        raise HTTPException(status_code=500, detail="DB not initialized")
+
+    conn = pool.getconn()
+    try:
+
+        conn.autocommit = True 
+        
+        with conn:
+            with conn.cursor() as cur:
+                # Use the UPSERT query you already defined at the top of main.py
+                cur.execute(SQL_UPSERT_USER, (
+                    username, 
+                    first, 
+                    last, 
+                    section
+                ))
+        conn.commit()
+        
+        print(f"DEBUG: Profile created/updated for {username} ({first} {last})")
+        
+        return {
+            "status": "success",
+            "username": username,
+            "message": f"Login successful. Profile for {first} {last} updated."
+        }
+    except Exception as e:
+        print(f"Database error in fake-login: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        pool.putconn(conn)
+
+
+# --- ANALYTICS QUERIES ---
+
+# prof view 
+@app.get("/stats/section/{section_id}")
+def get_section_report(section_id: str):
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            # 1. Individual Performance 
+            # Ensure SQL_PROF_STUDENT_STATS selects: first_name, last_name, username, game, avg, max, min
+            cur.execute(SQL_PROF_STUDENT_STATS, (section_id,))
+            student_stats = cur.fetchall()
+
+            # 2. Section Averages per Game
+            cur.execute(SQL_PROF_SECTION_AVERAGES, (section_id,))
+            averages = cur.fetchall()
+
+            # 3. Total Time Spent
+            cur.execute(SQL_PROF_STUDENT_TIME, (section_id,))
+            time_spent = cur.fetchall()
+
+            return {
+                "section": section_id,
+                "student_breakdown": [
+                    {
+                        "name": f"{r[0]} {r[1]}", # Combines real First and Last name
+                        "user": r[2], 
+                        "game": r[3],             # This ensures Phaser knows WHICH game the score is for
+                        "avg": float(r[4]) if r[4] is not None else 0.0, 
+                        "top": r[5], 
+                        "bottom": r[6]
+                    } for r in student_stats
+                ],
+                "section_game_averages": [
+                    {"game": r[0], "avg_score": float(r[1]) if r[1] is not None else 0.0} 
+                    for r in averages
+                ],
+                "total_time_records": [
+                    {"name": f"{r[0]} {r[1]}", "user": r[2], "seconds": r[3] or 0} 
+                    for r in time_spent
+                ]
+            }
+    finally:
+        pool.putconn(conn)
+
+# admin view 
+@app.get("/stats/admin/global-tops")
+def get_admin_global():
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SQL_ADMIN_GLOBAL_TOP_SCORES)
+            rows = cur.fetchall()
+            return [
+                {
+                    "game": r[0], 
+                    "score": r[1], 
+                    "student": f"{r[2]} {r[3]}", 
+                    "username": r[4], 
+                    "section": r[5]
+                } for r in rows
+            ]
+    finally:
+        pool.putconn(conn)
+
+
+@app.get("/stats/section/{section_id}/csv")
+def get_section_csv(section_id: str):
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SQL_PROF_STUDENT_STATS, (section_id,))
+            rows = cur.fetchall()
+
+            # Create an in-memory "file"
+            output = io.StringIO()
+            writer = csv.writer(output)
+            
+            # Add the Header Row for Excel
+            writer.writerow(["First Name", "Last Name", "Username", "Game", "Avg Score", "Top Score", "Bottom Score"])
+            
+            # Add the Data Rows
+            writer.writerows(rows)
+            
+            # Rewind the "file" to the beginning and stream it to the browser
+            output.seek(0)
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=section_{section_id}_report.csv"}
+            )
+    finally:
+        pool.putconn(conn)
+
+@app.get("/stats/admin/global-tops/csv")
+def get_admin_csv():
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SQL_ADMIN_GLOBAL_TOP_SCORES)
+            rows = cur.fetchall()
+
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["Game", "Score", "First Name", "Last Name", "Username", "Section"])
+            writer.writerows(rows)
+            
+            output.seek(0)
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": "attachment; filename=global_top_scores.csv"}
+            )
+    finally:
+        pool.putconn(conn)
+
+
+
+# --- ADMIN: ALL STUDENTS (No Section Filter) ---
+@app.get("/stats/admin/all-students")
+def get_all_students_admin():
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            # We reuse the Prof query but pass None or a wildcard if your SQL supports it, 
+            # OR we use a dedicated "Global" version of that query:
+            cur.execute("""
+                SELECT p.first_name, p.last_name, p.username, g.game, AVG(g.score), MAX(g.score), MIN(g.score), p.section
+                FROM public.player_profiles p
+                JOIN public.game_analytics g ON p.username = g.username
+                GROUP BY p.first_name, p.last_name, p.username, g.game, p.section
+                ORDER BY p.section ASC, p.last_name ASC;
+            """)
+            rows = cur.fetchall()
+            return [
+                {
+                    "name": f"{r[0]} {r[1]}", 
+                    "game": r[3], 
+                    "avg": float(r[4]), 
+                    "top": r[5], 
+                    "bottom": r[6],
+                    "section": r[7]
+                } for r in rows
+            ]
+    finally:
+        pool.putconn(conn)
+
+
+@app.get("/api/stats/admin/all-students/csv")
+def get_all_students_csv():
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT p.section, p.first_name, p.last_name, g.game, AVG(g.score), MAX(g.score)
+                FROM public.player_profiles p
+                JOIN public.game_analytics g ON p.username = g.username
+                GROUP BY p.section, p.first_name, p.last_name, g.game
+                ORDER BY p.section, p.last_name;
+            """)
+            rows = cur.fetchall()
+
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["Section", "First Name", "Last Name", "Game", "Avg Score", "High Score"])
+            for r in rows:
+                writer.writerow([r[0], r[1], r[2], r[3], round(float(r[4]), 2), r[5]])
+
+            output.seek(0)
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": "attachment; filename=all_students_report.csv"}
+            )
+    finally:
+        pool.putconn(conn)
+
+
+@app.post("/api/register-profile")
+def register_profile(payload: dict = Body(...)):
+    username = payload.get("username").lower()
+    first = payload.get("first_name")
+    last = payload.get("last_name")
+    section = payload.get("section")
+
+    conn = pool.getconn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO public.player_profiles (username, first_name, last_name, section)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (username) DO UPDATE SET
+                        first_name = EXCLUDED.first_name,
+                        last_name = EXCLUDED.last_name,
+                        section = EXCLUDED.section;
+                """, (username, first, last, section))
+        return {"status": "success"}
+    finally:
+        pool.putconn(conn)
