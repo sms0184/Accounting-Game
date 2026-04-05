@@ -18,7 +18,7 @@ export class GameOverScene extends Scene {
     this.timeSpentPlaying = (data && data.timeSpentPlaying) || 0; 
   }
 
-  // Normalize whatever we received into an actual scene key to restart
+  // Normalize whatever we received into an actual scene key to restart 
   _resolveRestartScene() {
     const key = String(this.gameKey || "");
     if (key === "GM3Level1" || key === "GM3-Level1") return "GM3Level1";

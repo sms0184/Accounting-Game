@@ -7,7 +7,7 @@ export class Leaderboard extends Scene {
 
     init(data) {
         this.gameKey = data.gameKey || "game1";
-        this.highlightName = data.highlightName || null;
+        this.highlightName = data.highlightName || null; 
 	this.scoreScope = "section"; // tab state
     }
 
