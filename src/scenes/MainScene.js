@@ -761,11 +761,16 @@ export class MainScene extends Scene {
             this.checkForBall(ball, basket)
         );
 
-        this.game.events.on("start-game", () => {
+        this.game.events.once("start-game", () => {
             this.scene.stop("MenuScene");
             this.input.setDefaultCursor("none"); // hide mouse in gameplay
+
+            // Use Registry for better reliability across scenes
+            this.registry.set('levelStartTime', Date.now());
+            console.log(`[Timer] MainScene started via Registry:`, this.registry.get('levelStartTime'));
             
-            this.game.levelStartTime = Date.now();
+            //console.log(`[Timer] MainScene started: ${this.game.levelStartTime}`);
+            
     console.log(`[Timer] MainScene started: ${this.game.levelStartTime}`);
             
             this.difficulty = parseInt(localStorage.getItem("difficulty") || 1);
