@@ -49,7 +49,7 @@ export default class ProfessorDash extends Scene {
 
         // --- 2. DATA FETCH ---
         try {
-            const response = await fetch(`http://accounting-game.cse.eng.auburn.edu/api/stats/section/${sectionId}`);
+            const response = await fetch(`https://accounting-game.cse.eng.auburn.edu/api/stats/section/${sectionId}`);
             const data = await response.json();
 
             // Create fresh container
@@ -76,7 +76,7 @@ export default class ProfessorDash extends Scene {
             // Add Download Button
             if (this.downloadBtn) this.downloadBtn.destroy();
             this.downloadBtn = this.createTabButton(this.scale.width / 2, 450, "Download CSV", () => {
-                window.open(`http://accounting-game.cse.eng.auburn.edu/api/stats/section/${sectionId}/csv`, "_blank");
+                window.open(`https://accounting-game.cse.eng.auburn.edu/api/stats/section/${sectionId}/csv`, "_blank");
             });
 
         } catch (e) {
