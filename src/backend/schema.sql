@@ -3,7 +3,10 @@
 
 -- might throw a "role already exists" error
 -- thats fine just ignore it, makes sure things are running smoothly on the first launch easier
-CREATE ROLE game_app LOGIN PASSWORD 'Turmoil4-Mouse8-Attic8-Shorthand4-Catsup8' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+
+-- Pass your password as a variable when running this script:
+-- psql -U postgres -h 127.0.0.1 -d postgres -v password='yourpassword' -f schema.sql
+CREATE ROLE game_app LOGIN PASSWORD :'password' NOSUPERUSER NOCREATEDB NOCREATEROLE;
 CREATE DATABASE leaderboard OWNER game_app;
 
 -- 
