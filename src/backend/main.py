@@ -69,12 +69,12 @@ class LeaderboardRow(BaseModel):
 
 SQL_GET_LEADERBOARD = """
 SELECT 
-    RANK() OVER (ORDER BY score DESC, created_at ASC) AS rank,
+    RANK() OVER (ORDER BY score DESC, played_at ASC) AS rank,
     score, 
     UPPER(SUBSTRING(username, 1, 3)) AS username
 FROM public.game_analytics
 WHERE game = %s
-ORDER BY score DESC, created_at ASC
+ORDER BY score DESC, played_at ASC
 LIMIT %s;
 """
 
