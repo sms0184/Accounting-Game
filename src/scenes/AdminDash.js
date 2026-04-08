@@ -42,7 +42,7 @@ export default class AdminDash extends Scene {
         this.statsContainer = this.add.container(this.scale.width / 2, 220);
 
         try {
-            const response = await fetch(`http://accounting-game.cse.eng.auburn.edu${endpoint}`);
+            const response = await fetch(`https://accounting-game.cse.eng.auburn.edu${endpoint}`);
             const data = await response.json();
 
             let yOffset = 0;
@@ -81,7 +81,7 @@ export default class AdminDash extends Scene {
 
             if (this.downloadBtn) this.downloadBtn.destroy();
             this.downloadBtn = this.createSmallBtn(this.scale.width - 80, 100, "CSV", () => {
-                window.open(`http://accounting-game.cse.eng.auburn.edu${endpoint}/csv`, "_blank");
+                window.open(`https://accounting-game.cse.eng.auburn.edu${endpoint}/csv`, "_blank");
             });
 
         } catch (e) {
