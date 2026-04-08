@@ -764,6 +764,10 @@ export class MainScene extends Scene {
         this.game.events.on("start-game", () => {
             this.scene.stop("MenuScene");
             this.input.setDefaultCursor("none"); // hide mouse in gameplay
+            
+            this.game.levelStartTime = Date.now();
+    console.log(`[Timer] MainScene started: ${this.game.levelStartTime}`);
+            
             this.difficulty = parseInt(localStorage.getItem("difficulty") || 1);
             this.time.addEvent({
 		// ADDED: speed multiplier
@@ -787,7 +791,7 @@ export class MainScene extends Scene {
                         this.scene.start("GameOverScene", {
                             points: this.points,
                             gameKey: this.game_key,
-                            timeSpentPlaying: Math.floor((this.time.now - this.startTime) / 1000),
+                            //timeSpentPlaying: Math.floor((this.time.now - this.startTime) / 1000), // This was broken anyway
                         });
                     } else {
                         this.game_over_timeout--;

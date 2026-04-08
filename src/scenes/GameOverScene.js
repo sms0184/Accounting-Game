@@ -11,8 +11,17 @@ export class GameOverScene extends Scene {
   init(data) {
     this.end_points = (data && (data.points ?? data.score)) || 0;
     this.gameKey = (data && (data.gameKey ?? data.mode)) || "MainScene";
-    this.timeSpentPlaying = (data && data.timeSpentPlaying) || 0; 
-  }
+    
+    // NEW UNIVERSAL CALCULATION
+    if (this.game.levelStartTime) {
+        const msElapsed = Date.now() - this.game.levelStartTime;
+        this.timeSpentPlaying = Math.floor(msElapsed / 1000);
+        // Reset it so it doesn't leak into the next game
+        this.game.levelStartTime = null; 
+    } else {
+        this.timeSpentPlaying = 0;
+    }
+}
 
   _resolveRestartScene() {
     const key = String(this.gameKey || "");
@@ -261,7 +270,7 @@ export class GameOverScene extends Scene {
             game: this.gameKey, 
             username: savedUsername, 
             score: parseInt(this.end_points, 10),
-            time_played: this.timeSpentPlaying
+            time_played: Math.floor(this.timeSpentPlaying / 1000) || 0
         }),
       });
 
@@ -281,7 +290,7 @@ export class GameOverScene extends Scene {
   }
 
   showQualificationUI(centerX, centerY) {
-    const msg = `🎉 Submit your score to the leaderboard!`;
+    const msg = `Submit your score to the leaderboard!`;
     this.add.text(centerX, centerY - 40, msg, {
       fontSize: "30px",
       color: "#efe6d3",
@@ -346,7 +355,7 @@ export class GameOverScene extends Scene {
               game: this.gameKey, 
               username: username, 
               score: score,
-              time_played: this.timeSpentPlaying 
+              time_played: Math.floor(this.timeSpentPlaying / 1000) || 0
           }),
         });
 

@@ -460,6 +460,12 @@ export default class GM3Level2 extends BaseGM3Scene {
 
     this.time.delayedCall(2400, () => {
       txt.destroy();
+
+      //time tracking for analytics - store the timestamp of when the level actually starts (after countdown)
+      this.game.levelStartTime = Date.now();
+      console.log(`[Timer] Started for ${this.scene.key} at: ${this.game.levelStartTime}`);
+
+      
       this._setGameplayUIVisible(true, true);
 
       this.timerEvent = this.time.addEvent({
