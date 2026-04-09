@@ -93,7 +93,7 @@ export class Leaderboard extends Scene {
 
         // --- Mode Buttons ---
         const modes = [
-            { label: "Dr. vs. Cr.", key: "game1" },
+            { label: "Db. vs. Cr.", key: "game1" },
             { label: "Elements", key: "game2" },
             { label: "Balance", key: "game3-1" },
             { label: "Effects", key: "game3-2" },
